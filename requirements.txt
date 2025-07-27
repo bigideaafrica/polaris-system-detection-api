@@ -1,0 +1,29 @@
+# 🌟 Polaris System Detection API Requirements
+
+# Core web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+numpy
+
+# Data validation and settings management
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# System monitoring
+psutil>=5.9.0
+
+# Machine Learning framework for device detection
+torch>=2.0.0
+
+# GPU monitoring libraries
+# NVIDIA GPU support
+pynvml>=11.5.0
+
+# AMD GPU support (ROCm)
+pyrsmi>=0.1.0
+
+# macOS-specific monitoring (optional, install only on macOS)
+# macmon>=1.0.0
+
+# Additional utilities
+watchfiles>=0.21.0  # For file watching functionality if needed

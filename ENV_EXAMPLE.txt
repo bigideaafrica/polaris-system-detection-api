@@ -1,0 +1,27 @@
+# 🌟 Polaris System Detection API Configuration
+# Copy this file to .env and modify as needed
+
+# Server settings
+POLARIS_HOST=0.0.0.0
+POLARIS_PORT=8339
+POLARIS_RELOAD=true
+POLARIS_LOG_LEVEL=info
+
+# API Configuration
+POLARIS_TITLE="🌟 Polaris System Detection API"
+POLARIS_DESCRIPTION="Advanced real-time system monitoring and hardware detection"
+
+# Legacy compatibility (disabled by default)
+POLARIS_LEGACY_COMPATIBLE=false
+POLARIS_LEGACY_PORT=8338
+
+# Feature toggles
+POLARIS_ENABLE_GPU_DETECTION=true
+POLARIS_ENABLE_MAC_SPECIFIC=true
+POLARIS_ENABLE_REALTIME_MONITORING=true
+
+# Monitoring intervals (seconds)
+POLARIS_CPU_CHECK_INTERVAL=1.0
+POLARIS_MEMORY_CHECK_INTERVAL=1.0
+POLARIS_DISK_CHECK_INTERVAL=5.0
+POLARIS_GPU_CHECK_INTERVAL=2.0 
