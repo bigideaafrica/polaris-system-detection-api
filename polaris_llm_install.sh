@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# 🌟 Polaris LLM Simple Installation Script (No Conda Required)
+# 🌟 Polaris LLM Simple Installation Script (Fixed)
 
 POLARIS_DIR="$HOME/.polarisllm"
 POLARIS_API_DIR="${POLARIS_DIR}/polarisllm-api"
@@ -108,18 +108,25 @@ download_polaris_llm() {
     ohai "✅ curl is installed."
   fi
 
+  if ! command -v unzip &> /dev/null; then
+    abort "❌ unzip is not installed. Please install unzip and try again."
+  else
+    ohai "✅ unzip is installed."
+  fi
+
   mkdir -p "${POLARIS_DIR}"
 
-  # Download Polaris API
-  ohai "📡 Downloading Polaris System Detection API..."
-  POLARIS_API_URL="https://github.com/bigideaafrica/polaris-system-detection-api/archive/refs/heads/main.zip"
+  # Download Polaris API - FIXED URL AND EXTRACTION
+  ohai "📡 Downloading Polaris LLM API..."
+  POLARIS_API_URL="https://github.com/bigideaafrica/polarisllm-api/archive/refs/heads/main.zip"
   
   curl -L "${POLARIS_API_URL}" -o "${POLARIS_DIR}/polaris-api.zip"
   rm -rf "${POLARIS_API_DIR}"
   
   cd "${POLARIS_DIR}"
   unzip -q polaris-api.zip
-  mv polaris-system-detection-api-main "${POLARIS_API_DIR}"
+  # Fixed: The actual folder name from the zip
+  mv polarisllm-api-main "${POLARIS_API_DIR}"
   rm polaris-api.zip
 
   POLARIS_API_VERSION=$(date +"%Y.%m.%d")
@@ -130,15 +137,21 @@ download_polaris_llm() {
   ohai "🎨 Downloading Polaris AI Studio..."
   POLARIS_STUDIO_URL="https://github.com/bigideaafrica/polaris-ai-studio/archive/refs/heads/main.zip"
   
-  curl -L "${POLARIS_STUDIO_URL}" -o "${POLARIS_DIR}/polaris-studio.zip"
-  rm -rf "${POLARIS_STUDIO_DIR}"
-  
-  unzip -q polaris-studio.zip
-  mv polaris-ai-studio-main "${POLARIS_STUDIO_DIR}"
-  rm polaris-studio.zip
+  # Check if the studio repo exists
+  if curl -f -s -o /dev/null "${POLARIS_STUDIO_URL}"; then
+    curl -L "${POLARIS_STUDIO_URL}" -o "${POLARIS_DIR}/polaris-studio.zip"
+    rm -rf "${POLARIS_STUDIO_DIR}"
+    
+    unzip -q polaris-studio.zip
+    mv polaris-ai-studio-main "${POLARIS_STUDIO_DIR}"
+    rm polaris-studio.zip
 
-  echo "v${POLARIS_API_VERSION}" > "${POLARIS_STUDIO_DIR}/LATEST_VERSION"
-  ohai "✅ Polaris Studio downloaded to ${POLARIS_STUDIO_DIR}"
+    echo "v${POLARIS_API_VERSION}" > "${POLARIS_STUDIO_DIR}/LATEST_VERSION"
+    ohai "✅ Polaris Studio downloaded to ${POLARIS_STUDIO_DIR}"
+  else
+    warn "Polaris AI Studio repository not found. Skipping studio installation."
+    warn "Only the API will be available."
+  fi
 
   cd "${RUN_DIR}"
   echo "🌟 Step 1: COMPLETE"
@@ -204,31 +217,32 @@ install_dependencies() {
   ohai "📦 Installing Polaris API Python dependencies..."
   cd "${POLARIS_API_DIR}"
 
-  if [ "$HAS_NVIDIA" = true ]; then
-    echo "Installing with CUDA support..."
-    if [ -e "requirements.txt" ]; then
+  # Check if requirements.txt exists
+  if [ -f "requirements.txt" ]; then
+    ohai "Found requirements.txt, installing dependencies..."
+    
+    if [ "$HAS_NVIDIA" = true ]; then
+      echo "Installing with CUDA support..."
       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
       pip install -r requirements.txt
-    else
-      # Fallback requirements
-      pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-      pip install fastapi uvicorn psutil pynvml
-    fi
-  elif [ "$HAS_AMD" = true ]; then
-    echo "Installing with ROCm support..."
-    if [ -e "requirements-rocm.txt" ]; then
-      pip install -r requirements-rocm.txt
-    elif [ -e "requirements.txt" ]; then
-      pip install -r requirements.txt
-    else
+    elif [ "$HAS_AMD" = true ]; then
+      echo "Installing with ROCm support..."
       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.6
-      pip install fastapi uvicorn psutil pyrsmi
-    fi
-  else
-    echo "Installing CPU-only versions..."
-    if [ -e "requirements.txt" ]; then
+      pip install -r requirements.txt
+    else
+      echo "Installing CPU-only versions..."
       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       pip install -r requirements.txt
+    fi
+  else
+    ohai "No requirements.txt found, installing basic dependencies..."
+    
+    if [ "$HAS_NVIDIA" = true ]; then
+      pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+      pip install fastapi uvicorn psutil pynvml
+    elif [ "$HAS_AMD" = true ]; then
+      pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.6
+      pip install fastapi uvicorn psutil pyrsmi
     else
       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       pip install fastapi uvicorn psutil
@@ -242,16 +256,24 @@ install_dependencies() {
     ohai "✅ Python dependencies installed successfully."
   fi
 
-  # Install Node.js dependencies for Studio
-  ohai "📦 Installing Polaris Studio Node.js dependencies..."
-  cd "${POLARIS_STUDIO_DIR}"
+  # Install Node.js dependencies for Studio (if exists)
+  if [ -d "${POLARIS_STUDIO_DIR}" ]; then
+    ohai "📦 Installing Polaris Studio Node.js dependencies..."
+    cd "${POLARIS_STUDIO_DIR}"
 
-  if check_node && check_npm; then
-    echo "Installing npm dependencies..."
-    npm install
-    ohai "✅ Studio dependencies installed."
+    if check_node && check_npm; then
+      if [ -f "package.json" ]; then
+        echo "Installing npm dependencies..."
+        npm install
+        ohai "✅ Studio dependencies installed."
+      else
+        warn "No package.json found in Studio directory."
+      fi
+    else
+      warn "Node.js/npm not available. Studio will not work until Node.js is installed."
+    fi
   else
-    warn "Node.js/npm not available. Studio will not work until Node.js is installed."
+    warn "Studio directory not found. Only API will be available."
   fi
 
   cd "${RUN_DIR}"
@@ -276,6 +298,13 @@ API_DIR="\${POLARIS_DIR}/polarisllm-api"
 
 echo "🌟 Starting Polaris API..."
 
+# Check if virtual environment exists
+if [ ! -d "\$VENV_DIR" ]; then
+    echo "❌ Virtual environment not found at \$VENV_DIR"
+    echo "Please run the installation script first."
+    exit 1
+fi
+
 # Activate virtual environment
 source "\$VENV_DIR/bin/activate"
 
@@ -285,14 +314,16 @@ cd "\$API_DIR"
 # Find the main file
 if [ -f "main.py" ]; then
     MAIN_FILE="main.py"
-elif [ -f "polaris_api.py" ]; then
-    MAIN_FILE="polaris_api.py"
 elif [ -f "app.py" ]; then
     MAIN_FILE="app.py"
+elif [ -f "server.py" ]; then
+    MAIN_FILE="server.py"
 else
-    echo "❌ No main Python file found (main.py, polaris_api.py, or app.py)"
+    echo "❌ No main Python file found (main.py, app.py, or server.py)"
     exit 1
 fi
+
+echo "🚀 Starting \$MAIN_FILE..."
 
 # Start with nohup
 nohup python "\$MAIN_FILE" > polaris_api.log 2>&1 &
@@ -306,8 +337,9 @@ echo "To stop: kill \$API_PID"
 echo "To view logs: tail -f \${API_DIR}/polaris_api.log"
 EOF
 
-  # Create Studio startup script
-  cat > "${POLARIS_DIR}/start_studio.sh" << EOF
+  # Create Studio startup script (only if studio exists)
+  if [ -d "${POLARIS_STUDIO_DIR}" ]; then
+    cat > "${POLARIS_DIR}/start_studio.sh" << EOF
 #!/bin/bash
 # 🎨 Polaris Studio Startup Script
 
@@ -341,8 +373,8 @@ echo "🚀 Running npm start..."
 npm start
 EOF
 
-  # Create combined startup script
-  cat > "${POLARIS_DIR}/start_polaris.sh" << EOF
+    # Create combined startup script
+    cat > "${POLARIS_DIR}/start_polaris.sh" << EOF
 #!/bin/bash
 # 🌟 Start both Polaris API and Studio
 
@@ -367,15 +399,19 @@ echo ""
 "\${POLARIS_DIR}/start_studio.sh"
 EOF
 
+    chmod +x "${POLARIS_DIR}/start_studio.sh"
+    chmod +x "${POLARIS_DIR}/start_polaris.sh"
+  fi
+
   # Make scripts executable
   chmod +x "${POLARIS_DIR}/start_api.sh"
-  chmod +x "${POLARIS_DIR}/start_studio.sh"
-  chmod +x "${POLARIS_DIR}/start_polaris.sh"
   
   ohai "✅ Startup scripts created:"
   echo "  🔧 API only:      ${POLARIS_DIR}/start_api.sh"
-  echo "  🎨 Studio only:   ${POLARIS_DIR}/start_studio.sh"
-  echo "  🌟 Both:          ${POLARIS_DIR}/start_polaris.sh"
+  if [ -d "${POLARIS_STUDIO_DIR}" ]; then
+    echo "  🎨 Studio only:   ${POLARIS_DIR}/start_studio.sh"
+    echo "  🌟 Both:          ${POLARIS_DIR}/start_polaris.sh"
+  fi
 }
 
 ##############################
@@ -390,10 +426,10 @@ start_polaris_api() {
   # Find main file
   if [ -f "main.py" ]; then
     MAIN_FILE="main.py"
-  elif [ -f "polaris_api.py" ]; then
-    MAIN_FILE="polaris_api.py"
   elif [ -f "app.py" ]; then
     MAIN_FILE="app.py"
+  elif [ -f "server.py" ]; then
+    MAIN_FILE="server.py"
   else
     abort "❌ No main Python file found"
   fi
@@ -407,6 +443,10 @@ start_polaris_api() {
 }
 
 start_polaris_studio() {
+  if [ ! -d "${POLARIS_STUDIO_DIR}" ]; then
+    abort "❌ Studio not installed. Only API is available."
+  fi
+  
   title "Starting Polaris Studio"
   cd "${POLARIS_STUDIO_DIR}"
   
@@ -437,6 +477,18 @@ doctor() {
     echo "❌ Virtual Environment: Not found"
   fi
   
+  if [ -d "$POLARIS_API_DIR" ]; then
+    echo "✅ API Directory: $POLARIS_API_DIR"
+  else
+    echo "❌ API Directory: Not found"
+  fi
+  
+  if [ -d "$POLARIS_STUDIO_DIR" ]; then
+    echo "✅ Studio Directory: $POLARIS_STUDIO_DIR"
+  else
+    echo "⚠️  Studio Directory: Not found (API-only mode)"
+  fi
+  
   if command -v node &> /dev/null; then
     echo "✅ Node.js: $(node --version)"
   else
@@ -463,17 +515,24 @@ print_success_message() {
   echo ""
   echo "📂 Installation Directory: ${POLARIS_DIR}"
   echo "🔧 API: ${POLARIS_API_DIR}"
-  echo "🎨 Studio: ${POLARIS_STUDIO_DIR}"
+  if [ -d "${POLARIS_STUDIO_DIR}" ]; then
+    echo "🎨 Studio: ${POLARIS_STUDIO_DIR}"
+  fi
   echo "🐍 Python Environment: ${VENV_DIR}"
   echo ""
   echo "🚀 Quick Start:"
-  echo "  ${POLARIS_DIR}/start_polaris.sh    # Start both API and Studio"
   echo "  ${POLARIS_DIR}/start_api.sh        # Start API only"
-  echo "  ${POLARIS_DIR}/start_studio.sh     # Start Studio only"
+  if [ -d "${POLARIS_STUDIO_DIR}" ]; then
+    echo "  ${POLARIS_DIR}/start_studio.sh     # Start Studio only"  
+    echo "  ${POLARIS_DIR}/start_polaris.sh    # Start both API and Studio"
+  fi
   echo ""
   echo "🌐 URLs (after starting):"
   echo "  API:    http://localhost:8339"
-  echo "  Studio: http://localhost:3000 (typically)"
+  echo "  Docs:   http://localhost:8339/docs"
+  if [ -d "${POLARIS_STUDIO_DIR}" ]; then
+    echo "  Studio: http://localhost:3000 (typically)"
+  fi
   echo ""
   echo "📝 Logs: ${POLARIS_API_DIR}/polaris_api.log"
   echo ""
@@ -511,7 +570,7 @@ else
       doctor
       ;;
     *)
-      echo "🌟 Polaris LLM Simple Installation Script"
+      echo "🌟 Polaris LLM Installation Script (Fixed)"
       echo ""
       echo "Available commands:"
       echo "  download_polaris_llm        - Download API and Studio"
