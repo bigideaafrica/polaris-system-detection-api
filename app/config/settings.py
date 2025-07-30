@@ -18,7 +18,7 @@ class PolarisSettings(BaseSettings):
     
     # Server Configuration
     host: str = "0.0.0.0"
-    port: int = 8339
+    port: int = int(os.environ.get("PORT", 8339))
     reload: bool = True
     log_level: str = "info"
     
